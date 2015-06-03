@@ -35,7 +35,7 @@ module JavaBuildpack
       def initialize(repository_root)
         @logger = JavaBuildpack::Logging::LoggerFactory.instance.get_logger RepositoryIndex
 
-        @default_repository_root = JavaBuildpack::Util::ConfigurationUtils.load('repository')['default_repository_root']
+        @default_repository_root = ENV[REPOSITORY_ROOT] || JavaBuildpack::Util::ConfigurationUtils.load('repository')['default_repository_root']
                                      .chomp('/')
 
         cache.get("#{canonical repository_root}#{INDEX_PATH}") do |file|
@@ -52,13 +52,15 @@ module JavaBuildpack
       def find_item(version)
         found_version = VersionResolver.resolve(version, @index.keys)
         fail "No version resolvable for '#{version}' in #{@index.keys.join(', ')}" if found_version.nil?
-        uri = @index[found_version.to_s]
+        uri = canonical @index[found_version.to_s]
         [found_version, uri]
       end
 
       private
 
       INDEX_PATH = '/index.yml'.freeze
+ 
+      REPOSITORY_ROOT = 'REPOSITORY_ROOT'.freeze
 
       private_constant :INDEX_PATH
 

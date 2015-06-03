@@ -45,6 +45,19 @@ describe JavaBuildpack::Repository::RepositoryIndex do
     expect(repository_index.find_item('test-version')).to eq(%w(resolved-version resolved-uri))
   end
 
+  it 'loads index and substitute repository root' do
+    allow(application_cache).to receive(:get).with(%r{/test-uri/index\.yml})
+                                .and_yield(Pathname.new('spec/fixtures/test-index-with-root-var.yml').open)
+    allow(JavaBuildpack::Repository::VersionResolver).to receive(:resolve).with('test-version', %w(resolved-version))
+                                                         .and_return('resolved-version')
+    allow(JavaBuildpack::Util::ConfigurationUtils).to receive(:load).with('repository')
+                                                      .and_return('default_repository_root' => 'http://default-repository-root/')
+
+    repository_index = described_class.new('{platform}/{architecture}/test-uri')
+
+    expect(repository_index.find_item('test-version')).to eq(%w(resolved-version http://default-repository-root/resolved-uri))
+  end
+
   it 'copes with trailing slash in repository URI' do
     allow(application_cache).to receive(:get).with(%r{/test-uri/index\.yml})
                                   .and_yield(Pathname.new('spec/fixtures/test-index.yml').open)
@@ -129,4 +142,18 @@ describe JavaBuildpack::Repository::RepositoryIndex do
       .to raise_error('Unable to determine platform')
   end
 
+  context 'override repository root with env var' do
+    before do
+      ENV['REPOSITORY_ROOT'] = 'http://foo'
+    end
+
+    it 'should substitute the overriden repository root' do
+      allow(JavaBuildpack::Util::ConfigurationUtils).to receive(:load).with('repository')
+                                                        .and_return('default_repository_root' => 'http://foo/')
+      expect(application_cache).to receive(:get).with('http://foo/test-uri/index.yml')
+                                   .and_yield(Pathname.new('spec/fixtures/test-index.yml').open)
+
+      described_class.new('{default.repository.root}/test-uri')
+    end
+  end
 end
